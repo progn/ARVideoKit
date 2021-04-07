@@ -21,8 +21,6 @@ class WritAR: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate {
     private var videoOutputSettings: Dictionary<String, AnyObject>!
     private var audioSettings: [String: Any]?
 
-    let audioBufferQueue = DispatchQueue(label: "com.ahmedbekhit.AudioBufferQueue")
-
     private var isRecording: Bool = false
     
     weak var delegate: RecordARDelegate?
@@ -57,10 +55,6 @@ class WritAR: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate {
             AVVideoHeightKey: height as AnyObject
         ]
         
-        let attributes: [String: Bool] = [
-            kCVPixelBufferCGImageCompatibilityKey as String: true,
-            kCVPixelBufferCGBitmapContextCompatibilityKey as String: true
-        ]
         videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoOutputSettings)
 
         videoInput.expectsMediaDataInRealTime = true
@@ -151,9 +145,7 @@ class WritAR: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate {
         audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
         audioInput.expectsMediaDataInRealTime = true
         
-        audioBufferQueue.async {
-            self.session?.startRunning()
-        }
+        session.startRunning()
         
         if assetWriter.canAdd(audioInput) {
             assetWriter.add(audioInput)
@@ -206,15 +198,10 @@ class WritAR: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate {
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        if let input = audioInput {
-            audioBufferQueue.async { [weak self] in
-                if let isRecording = self?.isRecording,
-                    let session = self?.session,
-                    input.isReadyForMoreMediaData && isRecording
-                        && session.isRunning {
-                    input.append(sampleBuffer)
-                }
-            }
+        guard let input = audioInput else { return }
+        
+        if input.isReadyForMoreMediaData && isRecording && session.isRunning {
+            input.append(sampleBuffer)
         }
     }
     
